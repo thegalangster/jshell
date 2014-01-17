@@ -67,7 +67,7 @@ int main()
      or if 'exit' was typed as the first
      command */
 
-  //EXIT CODE HERE
+  if(
 
   while(word!= NULL)
     {

@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <string.h>
+//#include "fields.h"
+
+int main()
+{
+
+  char buffer[256];
+  char buffer2[256];
+  //  do{
+
+    printf("Jshell: ");
+    scanf("%[^\n]",buffer);
+    char *split;
+    split= strtok(buffer, " ");
+    while(split!= NULL)
+      {
+	printf("%s\n",split);
+	split= strtok(NULL, " ");
+      }
+      printf("word:%s ",buffer);
+
+  return 0;
+
+}
