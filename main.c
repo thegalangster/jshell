@@ -1,24 +1,15 @@
-B/* CMPSC 170
+/* CMPSC 170
  0;136;0c  Lab 1: Jshell
    Aimee Galang & Sean Spearman */
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include "fields.h"
+#include <errno.h>
+#include "Command.h"
 
-struct Info{
-  char *input_file;
-  char *output_file;
-  char *append_file;
-
-  int background;
-  char **newargv;
-
-  struct Info *next;
-};
-
-struct Info *head;//head of the linked list of commands
+Command *head; //head of the linked list of commands
 
 int main()
 {
@@ -40,7 +31,7 @@ int main()
   /* First element of the linked list is
      created for the first command */
 
-  struct Info *command= (struct Info *)malloc(sizeof(struct Info));
+  Command *command= (Command *)malloc(sizeof(Command));
   head= command;
 
   if(command== NULL)
@@ -132,7 +123,7 @@ int main()
 	    else
 	      command->newargv[i]= NULL;
 	  i= 0;
-	  struct Info *new= (struct Info *)malloc(sizeof(struct Info));
+	  Command *new= (Command *)malloc(sizeof(Command));
 	  if(new== NULL)
 	    {
 	      perror("ERROR: Dynamic memory allocation of a command element in the linked list failed.\n");
@@ -179,6 +170,59 @@ int main()
     }
     else
       command->newargv[i]= NULL;
+
+  /* Fork and Execute */
+  // NOTE: my code assumes use of the pipeline struct. 
+  pid_t childpid;
+  int status;
+  int pipefd[2];
+  int pipeout, pipein, nextin, inputfd;
+  int commandnum = 1;
+
+  // Loop through all commands
+  Command *travel;
+  for (travel = pipeline->head; travel->next != NULL; travel = travel->next) {
+    // If this is not the last command in the pipeline, call pipe.
+    if (/* this is not the last command in the pipeline*/ 1) {
+      if (-1 == pipe(pipefd)) {
+	perror("pipe");
+        exit(EXIT_FAILURE);
+      }
+      pipein = pipefd[0];
+      pipeout = pipefd[1];
+    }
+    // Fork child process. 
+    childpid = fork();
+    if (-1 == childpid) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+    // If this is the child process, 
+    if (0 == childpid) {
+      // If first command in pipeline
+      if (1 == commandnum) { // Was going to do *travel == *head but it made me uneasy
+	// If there is input redirection
+	if (NULL != input_file) { // Unsure if this will work, could just have a boolean inputRedirection var in Command struct if it causes problems.
+	  if (-1 == close(stdin)) // Close stdin 
+	    perror("close");
+	  if (-1 == open(input_file, O_RDONLY)) // Open input_file, should replace stdin
+	    perror("open");
+	}
+      } else {
+	if (-1 == close(stdin)) // Close stdin 
+	  perror("close");
+	if (-1 == dup(stdin, pipein)) // Duplicate stdin to 
+	  perror("dup");
+	if (-1 == close(pipein)) 
+	  perror("close");
+      }
+      // If last command in pipeline
+      if (pipeline->length == commandnum) {
+	
+      }
+    }
+    ++commandnum;
+  }
 
   return 0;
 }
