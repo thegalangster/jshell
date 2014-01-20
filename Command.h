@@ -14,7 +14,7 @@ struct Command {
 };
 
 // Can we use this to contain the linked list of commands?
-typdef struct {
+typedef struct {
   Command* head;
   int length;
 } Pipeline;
