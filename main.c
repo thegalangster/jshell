@@ -173,6 +173,7 @@ int main()
 
   /* Fork and Execute */
   // NOTE: my code assumes use of the pipeline struct. 
+  /*
   pid_t childpid;
   int status;
   int pipefd[2];
@@ -183,7 +184,7 @@ int main()
   Command *travel;
   for (travel = pipeline->head; travel->next != NULL; travel = travel->next) {
     // If this is not the last command in the pipeline, call pipe.
-    if (/* this is not the last command in the pipeline*/ 1) {
+    if (commandnum != pipeline->length) {
       if (-1 == pipe(pipefd)) {
 	perror("pipe");
         exit(EXIT_FAILURE);
@@ -194,10 +195,10 @@ int main()
     // Fork child process. 
     childpid = fork();
     if (-1 == childpid) {
-        perror("fork");
-        exit(EXIT_FAILURE);
+      perror("fork");
+      exit(EXIT_FAILURE);
     }
-    // If this is the child process, 
+    // If this is the child process 
     if (0 == childpid) {
       // If first command in pipeline
       if (1 == commandnum) { // Was going to do *travel == *head but it made me uneasy
@@ -209,20 +210,59 @@ int main()
 	    perror("open");
 	}
       } else {
-	if (-1 == close(stdin)) // Close stdin 
+	if (-1 == close(stdin)) 
 	  perror("close");
-	if (-1 == dup(stdin, pipein)) // Duplicate stdin to 
+	if (-1 == dup(pipein)) // Make duplicate of pipein at stdin
 	  perror("dup");
-	if (-1 == close(pipein)) 
+	if (-1 == close(pipein)) // Close other pipein since stdin now is fd for it 
 	  perror("close");
       }
       // If last command in pipeline
       if (pipeline->length == commandnum) {
-	
+	// If there is output overwrite redirect
+	if (NULL != output_file) {
+	  if (-1 == close(stdout)) 
+	    perror("close");
+	  if (-1 == open(output_file, O_WRONLY))
+	    perror("open");
+	}
+	// If there is output append redirect
+	else if (NULL != append_file) {	
+	  if (-1 == close(stdout)) 
+	    perror("close");
+	  if (-1 == open(output_file, O_APPEND))
+	    perror("open");
+	}
+      } else {
+	if (-1 == close(nextin))
+	  perror("close");
+	if (-1 == close(stdout))
+	  perror("close");
+	if (-1 == dup(pipeout)) 
+	  perror("dup");
+	if (-1 == close(pipeout)) 
+	  perror("close");
+      }
+      if(-1 == execvp(travel->newargv[0], travel->newargv)) // This won't compile b/c newargv ain't const.
+	perror("execvp");
+    } else { // Else it is the parent process (Jshell)
+      // Record the child PID here (what?)
+      
+      // If this is NOT the first process in the pipeline
+      if (1 != commandnum) {
+	// Close pipein since child has it
+	if (-1 == close(pipein))
+	  perror("close");
+      }
+      // If this is NOT the last process in the pipeline
+      if (pipeline->length != commandnum) {
+	// Could alternatively be written(?): (close(pipeout) == -1) ? perror("close");
+	if (-1 == close(pipeout))
+	  perror("close");
       }
     }
     ++commandnum;
   }
-
+*/
   return 0;
 }
