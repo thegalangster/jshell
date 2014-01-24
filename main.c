@@ -1,78 +1,104 @@
 /* CMPSC 170
- 0;136;0c  Lab 1: Jshell
+   Lab 1: Jshell
    Aimee Galang & Sean Spearman */
 
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include "Command.h"
+//#include "fields.h"
 
-Command *head; //head of the linked list of commands
+struct Info{
+  char *input_file;
+  char *output_file;
+  char *append_file;
+
+  //  int background;
+  char **newargv;
+
+  struct Info *next;
+};
+
 
 int main()
 {
 
-  /* Scanf is used to grab a string of stdin
-     until a newline character is reached. 
-     The string is stored in a character array
-     named buffer. Length is also kept track
-     of to check for if an & is the last
-     character */
+  struct Info *head;//head of the linked list of commands
+  int background= 0;//flag if we want to run line in background
+  //  int background_flag;
+
+  while(1)
+    {
 
   char buffer[256];
 
-  printf("Jshell: ");
-  scanf("%[^\n]",buffer);
-
+  /* Fgets is used to grab a string of stdin
+     until a newline character is reached. 
+     The string is stored in a character array
+     named buffer. */
+  printf("jshell: ");
+  fflush(stdin);
+  if(fgets(buffer,256,stdin)== NULL)
+    return 0;
+  buffer[strlen(buffer)-1]= '\0';
   printf("%s\n",buffer);
 
   /* First element of the linked list is
      created for the first command */
-
-  Command *command= (Command *)malloc(sizeof(Command));
+  struct Info *command= (struct Info *)malloc(sizeof(struct Info));
   head= command;
-
   if(command== NULL)
-    {
-      perror("ERROR: Dynamic memory allocation of a command element in the linked list failed.\n");
-      //NEED ERROR EXIT PROPERLY
-    }
+    exit(1);
   command->newargv= (char **)malloc(sizeof(char *)*256);
+  if(command->newargv== NULL)
+    exit(1);
+  command->newargv[0]= NULL;
   command->next= NULL;
   command->input_file= NULL;
   command->output_file= NULL;
   command->append_file= NULL;
-  command->background= 0;
+  //  command->background= 0;
 
   /* Strtok() is used to parse the string
      buffer by white-spaces. */
-
   char *word;
   int i= 0;
 
   word= strtok(buffer, " ");
 
-  /* Exit Jshell if CTRL-D is hit/stdin closed
-     or if 'exit' was typed as the first
-     command */
-
-  //EXIT CODE HERE
-
   while(word!= NULL)
     {
+      if(!strcmp(word,"exit"))//exit if 'exit' if first word
+	return 0;
+
+      /* Error Checking
+	 Check for ||, &&, if or while */
+      if(!strcmp(word,"||")||!strcmp(word,"&&")||!strcmp(word,"if")||!strcmp(word,"while"))
+	{
+	  perror("no support for an input shell builtin command");
+	  exit(1);
+	}
+
       printf("%s\n",word);//TEST: print word by word
 
       /* I/O redirection characters are checked
 	 for. If they are found, the word after the
 	 the I/O character is stored into
 	 the command's element in the linked list. */
-
       if(!strcmp(word,"<"))
 	{
  	  word= strtok(NULL, " ");
+
+	  /* Error Checking
+	     Check stray < with no following word as file input */
+	  if(word== NULL)
+	    {
+	      perror("no input file inputted");
+	      exit(1);
+	    }
+
 	  command->input_file= (char *)malloc(sizeof(char)*strlen(word));
+	  if(command->input_file== NULL)
+	    exit(1);
 	  strcpy(command->input_file,word);
 
  	  printf("input file: %s\n",word);
@@ -83,7 +109,18 @@ int main()
       if(!strcmp(word,">"))
 	{
  	  word= strtok(NULL, " ");
+
+	  /* Error Checking
+	     Check stray > with no following word as file output */
+	  if(word== NULL)
+	    {
+	      perror("no output file inputted");
+	      exit(1);
+	    }
+
 	  command->output_file= (char *)malloc(sizeof(char)*strlen(word));
+	  if(command->output_file== NULL)
+	    exit(1);
 	  strcpy(command->output_file,word);
 
 	  printf("output file: %s\n",word);
@@ -94,7 +131,18 @@ int main()
       if(!strcmp(word,"<<"))
 	{
  	  word= strtok(NULL, " ");
+
+	  /* Error Checking
+	     Check stray << with no following word as file to append */
+	  if(word== NULL)
+	    {
+	      perror("no file to append inputted");
+	      exit(1);
+	    }
+
 	  command->append_file= (char *)malloc(sizeof(char)*strlen(word));
+	  if(command->append_file== NULL)
+	    exit(1);
 	  strcpy(command->append_file,word);
 
 	  printf("append file: %s\n",word);
@@ -106,70 +154,87 @@ int main()
       /* A pipe is found so a new element
 	 of the linked list is created to
 	 hold new command information */
-
       if(!strcmp(word,"|"))
 	{
-	  /* Checks for an & at the end of
-	     each command and flags the command
-	     elements variable named 'background' */
-	  if(!strcmp(command->newargv[i-1],"&"))
-	    {
 
-	      printf("& override argv[%i]= %s\n",i-1,command->newargv[i-1]);
-
-	      command->newargv[i-1]= NULL;
-	      command->background= 1;
-	    }
-	    else
-	      command->newargv[i]= NULL;
 	  i= 0;
-	  Command *new= (Command *)malloc(sizeof(Command));
+	  struct Info *new= (struct Info *)malloc(sizeof(struct Info));
 	  if(new== NULL)
-	    {
-	      perror("ERROR: Dynamic memory allocation of a command element in the linked list failed.\n");
-	      //NEED ERROR EXIT PROPERLY
-	    }
+	    exit(1);
 	  command->next= new;
 	  command= new;
 	  command->newargv= (char **)malloc(sizeof(char *)*256);
+	  if(command->newargv== NULL)
+	    exit(1);
+	  command->newargv[0]= NULL;
 	  command->input_file= NULL;
 	  command->output_file= NULL;
 	  command->append_file= NULL;
-	  command->background= 0;
+	  //	  command->background= 0;
 
 	  printf("New linked list element\n");
+
 
 	  word= strtok(NULL, " ");
 	  continue;
 	}
 
-      /* If a word is not a <,> or << then
+      /* Checks for & as the last character in a line and
+	 sets background= 1 for the command if so */
+      char *hold= word;
+      word= strtok(NULL, " ");
+      if((word== NULL)&&(!strcmp(hold,"&")))
+	{
+	  background= 1;
+	  //	  background_flag= 1;
+	  break;
+	}
+
+      /* Error Checking
+	 Checks for & that are not at the end of a line and exits */
+      else
+	{
+	  if(!strcmp(hold,"&"))
+	    {
+	      perror("& in invalid location");
+	      exit(1);
+	    }      
+	}
+
+      /* If a word is not a &, <, > or << then
 	 it is either a command name or a
 	 command argument or flag. */
-
-      char *mem= (char *)malloc(sizeof(char)*strlen(word));
-      strcpy(mem,word);
+      char *mem= (char *)malloc(sizeof(char)*strlen(hold));
+      if(mem== NULL)
+	exit(1);
+      strcpy(mem,hold);
       command->newargv[i]= mem;
       printf("argv[%i]: %s\n",i,command->newargv[i]);
       i++;
 
-      word= strtok(NULL, " ");
     }
 
-  /* Checks for an & at the end of
-     each command and flags the command
-     elements variable named 'background' */
+  command->newargv[i]= NULL;
 
-  if(!strcmp(command->newargv[i-1],"&"))
+  /* Error Checking
+     Checks for empty newargv array (no commands and arguments) 
+     Additionally, if & is the last word we set the entire
+     linked list to run in the background*/
+  struct Info *temp;
+  for(temp= head;temp!= NULL;temp= temp->next)
     {
-
-      printf("& override argv[%i]= %s\n",i-1,command->newargv[i-1]);
-
-      command->newargv[i-1]= NULL;
-      command->background= 1;
+      if(temp->newargv[0]== NULL)
+	{
+	  perror("missing command");
+	  exit(1);
+	}
+      /*
+      if(background_flag)
+	temp->background= 1;
+      */
     }
-    else
-      command->newargv[i]= NULL;
+  //  background_flag= 0;
+    }
 
   /* Fork and Execute */
   // NOTE: my code assumes use of the pipeline struct. 
