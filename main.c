@@ -22,8 +22,8 @@ struct Info{
 int main()
 {
 
-  struct Info *head;//head of the linked list of commands
-  int background= 0;//flag if we want to run line in background
+  struct Info *head; // head of the linked list of commands
+  int background= 0; // flag if we want to run line in background
   //  int background_flag;
 
   while(1)
@@ -35,22 +35,29 @@ int main()
      until a newline character is reached. 
      The string is stored in a character array
      named buffer. */
+
   printf("jshell: ");
   fflush(stdin);
-  if(fgets(buffer,256,stdin)== NULL)
+  if(fgets(buffer,256,stdin)== NULL) // CTRL-D exit
     return 0;
   buffer[strlen(buffer)-1]= '\0';
-  printf("%s\n",buffer);
 
   /* First element of the linked list is
      created for the first command */
+
   struct Info *command= (struct Info *)malloc(sizeof(struct Info));
   head= command;
   if(command== NULL)
-    exit(1);
+    {
+      fprintf(stderr,"ERROR: malloc allocation\n");
+      exit(1);
+    }
   command->newargv= (char **)malloc(sizeof(char *)*256);
   if(command->newargv== NULL)
-    exit(1);
+    {
+      fprintf(stderr,"ERROR: malloc allocation\n");
+      exit(1);
+    }
   command->newargv[0]= NULL;
   command->next= NULL;
   command->input_file= NULL;
@@ -60,45 +67,52 @@ int main()
 
   /* Strtok() is used to parse the string
      buffer by white-spaces. */
+
   char *word;
   int i= 0;
+  int redo= 0;
 
   word= strtok(buffer, " ");
-
   while(word!= NULL)
     {
-      if(!strcmp(word,"exit"))//exit if 'exit' if first word
+      if(!strcmp(word,"exit")) // exit if 'exit' if first word
 	return 0;
 
       /* Error Checking
 	 Check for ||, &&, if or while */
+
       if(!strcmp(word,"||")||!strcmp(word,"&&")||!strcmp(word,"if")||!strcmp(word,"while"))
 	{
-	  perror("no support for an input shell builtin command");
-	  exit(1);
+	  fprintf(stderr,"ERROR: no support for input shell built-in command %s\n",word);
+	  redo= 1;
+	  break;
 	}
-
-      printf("%s\n",word);//TEST: print word by word
 
       /* I/O redirection characters are checked
 	 for. If they are found, the word after the
 	 the I/O character is stored into
 	 the command's element in the linked list. */
+
       if(!strcmp(word,"<"))
 	{
  	  word= strtok(NULL, " ");
 
 	  /* Error Checking
 	     Check stray < with no following word as file input */
-	  if(word== NULL)
+
+	  if((word== NULL)||(!strcmp(word,"|")))
 	    {
-	      perror("no input file inputted");
-	      exit(1);
+	      fprintf(stderr,"ERROR: no input file inputted after <\n");
+	      redo= 1;
+	      break;
 	    }
 
 	  command->input_file= (char *)malloc(sizeof(char)*strlen(word));
 	  if(command->input_file== NULL)
-	    exit(1);
+	    {
+	      fprintf(stderr,"ERROR: malloc allocation\n");
+	      exit(1);
+	    }
 	  strcpy(command->input_file,word);
 
  	  printf("input file: %s\n",word);
@@ -112,15 +126,20 @@ int main()
 
 	  /* Error Checking
 	     Check stray > with no following word as file output */
-	  if(word== NULL)
+
+	  if((word== NULL)||(!strcmp(word,"|")))
 	    {
-	      perror("no output file inputted");
-	      exit(1);
+	      fprintf(stderr,"ERROR: no output file inputted after >\n");
+	      redo= 1;
+	      break;
 	    }
 
 	  command->output_file= (char *)malloc(sizeof(char)*strlen(word));
 	  if(command->output_file== NULL)
-	    exit(1);
+	    {
+	      fprintf(stderr,"ERROR: malloc allocation\n");
+	      exit(1);
+	    }
 	  strcpy(command->output_file,word);
 
 	  printf("output file: %s\n",word);
@@ -134,15 +153,20 @@ int main()
 
 	  /* Error Checking
 	     Check stray << with no following word as file to append */
-	  if(word== NULL)
+
+	  if((word== NULL)||(!strcmp(word,"|")))
 	    {
-	      perror("no file to append inputted");
-	      exit(1);
+	      fprintf(stderr,"ERROR: no file to append inputted after <<\n");
+	      redo= 1;
+	      break;
 	    }
 
 	  command->append_file= (char *)malloc(sizeof(char)*strlen(word));
 	  if(command->append_file== NULL)
-	    exit(1);
+	    {
+	      fprintf(stderr,"ERROR: malloc allocation\n");
+	      exit(1);
+	    }
 	  strcpy(command->append_file,word);
 
 	  printf("append file: %s\n",word);
@@ -154,18 +178,25 @@ int main()
       /* A pipe is found so a new element
 	 of the linked list is created to
 	 hold new command information */
+
       if(!strcmp(word,"|"))
 	{
 
 	  i= 0;
 	  struct Info *new= (struct Info *)malloc(sizeof(struct Info));
 	  if(new== NULL)
-	    exit(1);
+	    {
+	      fprintf(stderr,"ERROR: malloc allocation\n");
+	      exit(1);
+	    }
 	  command->next= new;
 	  command= new;
 	  command->newargv= (char **)malloc(sizeof(char *)*256);
 	  if(command->newargv== NULL)
-	    exit(1);
+	    {
+	      fprintf(stderr,"ERROR: malloc allocation\n");
+	      exit(1);
+	    }
 	  command->newargv[0]= NULL;
 	  command->input_file= NULL;
 	  command->output_file= NULL;
@@ -179,39 +210,75 @@ int main()
 	  continue;
 	}
 
+      /* Error Checking
+	 Check if there are multiple '|'s without spaces */
+
+      if(strchr(word,'|')!= NULL)
+	{
+	  fprintf(stderr, "Error: mulitple '|'s with no commands\n");
+	  redo= 1;
+	  break;
+	}
+
       /* Checks for & as the last character in a line and
 	 sets background= 1 for the command if so */
+
       char *hold= word;
       word= strtok(NULL, " ");
       if((word== NULL)&&(!strcmp(hold,"&")))
 	{
 	  background= 1;
 	  //	  background_flag= 1;
+	  printf("runs in background\n");
 	  break;
 	}
 
       /* Error Checking
 	 Checks for & that are not at the end of a line and exits */
+
       else
 	{
 	  if(!strcmp(hold,"&"))
 	    {
-	      perror("& in invalid location");
-	      exit(1);
+	      fprintf(stderr,"ERROR: & in invalid location\n");
+	      redo= 1;
+	      break;
 	    }      
 	}
 
       /* If a word is not a &, <, > or << then
 	 it is either a command name or a
 	 command argument or flag. */
+
       char *mem= (char *)malloc(sizeof(char)*strlen(hold));
       if(mem== NULL)
-	exit(1);
+	{
+	  fprintf(stderr,"malloc error\n");
+	  exit(1);
+	}
       strcpy(mem,hold);
       command->newargv[i]= mem;
       printf("argv[%i]: %s\n",i,command->newargv[i]);
       i++;
+    }
 
+  /* Checks if 'redo' syntax error is flagged and
+     jshell re-asks for a new correct line to be
+     inputted */
+
+  if(redo)
+    {
+      redo= 0;
+
+      /* De-allocate Memory */
+
+      struct Info *temp1;
+      for(temp1= head;temp1!= NULL;temp1= temp1->next)
+	{
+	  free(temp1->newargv);
+	  free(temp1);
+	}
+      continue;
     }
 
   command->newargv[i]= NULL;
@@ -220,13 +287,15 @@ int main()
      Checks for empty newargv array (no commands and arguments) 
      Additionally, if & is the last word we set the entire
      linked list to run in the background*/
+
   struct Info *temp;
   for(temp= head;temp!= NULL;temp= temp->next)
     {
       if(temp->newargv[0]== NULL)
 	{
-	  perror("missing command");
-	  exit(1);
+	  fprintf(stderr,"ERROR: no command\n");
+	  redo= 1;
+	  break;
 	}
       /*
       if(background_flag)
@@ -234,7 +303,45 @@ int main()
       */
     }
   //  background_flag= 0;
+
+  /* Checks if 'redo' syntax error is flagged and
+     jshell re-asks for a new correct line to be
+     inputted */
+
+  if(redo)
+    {
+      redo= 0;
+
+      /* De-allocate Memory */
+
+      struct Info *temp1;
+      for(temp1= head;temp1!= NULL;temp1= temp1->next)
+	{
+	  free(temp1->newargv);
+	  free(temp1);
+	}
+      continue;
     }
+
+
+
+  /* Fork and Execute Insert Here */
+
+
+
+  /* De-allocate Memory */
+  struct Info *temp1;
+  for(temp1= head;temp1!= NULL;temp1= temp1->next)
+    {
+      free(temp1->newargv);
+      free(temp1);
+    }
+    }
+
+  return 0;
+}
+
+
 
   /* Fork and Execute */
   // NOTE: my code assumes use of the pipeline struct. 
@@ -329,5 +436,3 @@ int main()
     ++commandnum;
   }
 */
-  return 0;
-}
