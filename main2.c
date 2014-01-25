@@ -311,15 +311,36 @@ int main()
     }
 
   /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
+
+  int pipeout, nextin;
+  int pipefd[2];
+
+  /* Loop through commands */
+
+  struct Info temp;
+  for(temp= head; temp!= NULL; temp= temp->next)
+    {
+
+      /* If this is not the last command in the pipeline:
+	 Call pipe to allcoate two file descriptors for the pipe
+	 and save one as 'pipeout' and 'nextin' */
+
+      if(temp->next!= NULL)
+	{
+
+	  int i= pipe(pipefd);
+	  if(i< 0)
+	    {
+	      perror("Pipe error");
+	      exit(1);
+	    }
+
+
+
+	}
+
+    } // end loop through commands
+
 
   /* De-allocate Memory */
 
