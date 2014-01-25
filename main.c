@@ -61,6 +61,8 @@ int main()
   command->input_file= NULL;
   command->output_file= NULL;
   command->append_file= NULL;
+  background= 0;
+  head= command;
 
   /* Strtok() is used to parse the string
      buffer by white-spaces. */
