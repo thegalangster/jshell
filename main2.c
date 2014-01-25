@@ -335,8 +335,7 @@ int main()
 
       if(temp->next!= NULL)
 	{
-	  int i= pipe(pipefd);
-	  if(i< 0)
+	  if(pipe(pipefd)< 0)
 	    {
 	      perror("pipe");
 	      exit(1);
@@ -345,12 +344,12 @@ int main()
 	  nextin= pipefd[0];
 	}
 
-	  /* Call fork -> if this is the child */
+      /* Call fork -> if this is the child */
 
       childpid= fork();
       if(childpid< 0)
 	{
-	  perror("fork not successful");
+	  perror("fork");
 	  exit(1);
 	}
 
@@ -368,10 +367,9 @@ int main()
 		  if(temp->input_file!= NULL)
 		    {
 		      close(0);
-		      int fd1= open(temp->input_file,O_RDWR,0666);
-		      if(fd1< 0)
+		      if(open(temp->input_file,O_RDWR,0666)< 0)
 			{
-			  perror("cannot open input file");
+			  perror("input file");
 			  exit(1);
 			}
 		    }
@@ -381,9 +379,21 @@ int main()
 
 		  else
 		    {
-		      close(0);
-		      dup2(pipein,0);
-		      close(pipein);
+		      if(close(0)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		      if(dup2(pipein,0)< 0)
+			{
+			  perror("dup2");
+			  exit(1);
+			}
+		      if(close(pipein)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
 		    }
 
 	      /* If this is the last command in
@@ -397,8 +407,7 @@ int main()
 		  if(temp->output_file!= NULL)
 		    {
 		      close(1);
-		      int fd2= open(temp->output_file,O_RDWR|O_TRUNC|O_CREAT,0666);
-		      if(fd2< 0)
+		      if(open(temp->output_file,O_RDWR|O_TRUNC|O_CREAT,0666)< 0)
 			{
 			  perror("cannot open output file");
 			  exit(1);
@@ -421,16 +430,32 @@ int main()
 
 		  else
 		    {
-		      close(nextin);
-		      close(1);
-		      dup2(pipeout,1);
-		      close(pipeout);
+		      if(close(nextin)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		      if(close(1)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		      if(dup2(pipeout,1)< 0)
+			{
+			  perror("pipe");
+			  exit(1);
+			}
+		      if(close(pipeout)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
 		    }
 
 	      /* Call execvp */
 
 	      execvp(temp->newargv[0],temp->newargv);
-	      perror("execution failed: check for invalid commands and arguments");
+	      perror("execution failed -> check for invalid commands and arguments");
 	      exit(1);
 	    }
 
@@ -444,14 +469,22 @@ int main()
 
 	      if(temp!= head)
 		{
-		  close(pipein);
+		  if(close(pipein)< 0)
+		    {
+		      perror("close");
+		      exit(1);
+		    }
 		}
 
 	      /* If not the last process */
 
 	      if(temp->next!= NULL)
 		{
-		  close(pipeout);
+		  if(close(pipeout)< 0)
+		    {
+		      perror("close");
+		      exit(1);
+		    }
 		  pipein= nextin;
 		}
 	    }
