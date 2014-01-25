@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcnt1.h>
 
 struct Info{
 
@@ -262,13 +263,13 @@ int main()
      jshell re-asks for a new correct line to be
      inputted */
 
+  struct Info *temp1;
   if(redo)
     {
       redo= 0;
 
       /* De-allocate Memory */
 
-      struct Info *temp1;
       for(temp1= head;temp1!= NULL;temp1= temp1->next)
 	{
 	  free(temp1->newargv);
@@ -282,7 +283,6 @@ int main()
   /* Error Checking
      Checks for empty newargv array (no commands and arguments) */
 
-  struct Info *temp1;
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
     {
       if(temp1->newargv[0]== NULL)
@@ -312,20 +312,8 @@ int main()
       continue;
     }
 
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-  /* FORK AND EXECUTE HERE */
-
   /* De-allocate Memory */
 
-  struct Info *temp1;
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
     {
       free(temp1->newargv);
@@ -335,99 +323,3 @@ int main()
 
   return 0;
 }
-
-
-
-  /* Fork and Execute */
-  // NOTE: my code assumes use of the pipeline struct. 
-  /*
-  pid_t childpid;
-  int status;
-  int pipefd[2];
-  int pipeout, pipein, nextin, inputfd;
-  int commandnum = 1;
-
-  // Loop through all commands
-  Command *travel;
-  for (travel = pipeline->head; travel->next != NULL; travel = travel->next) {
-    // If this is not the last command in the pipeline, call pipe.
-    if (commandnum != pipeline->length) {
-      if (-1 == pipe(pipefd)) {
-	perror("pipe");
-        exit(EXIT_FAILURE);
-      }
-      pipein = pipefd[0];
-      pipeout = pipefd[1];
-    }
-    // Fork child process. 
-    childpid = fork();
-    if (-1 == childpid) {
-      perror("fork");
-      exit(EXIT_FAILURE);
-    }
-    // If this is the child process 
-    if (0 == childpid) {
-      // If first command in pipeline
-      if (1 == commandnum) { // Was going to do *travel == *head but it made me uneasy
-	// If there is input redirection
-	if (NULL != input_file) { // Unsure if this will work, could just have a boolean inputRedirection var in Command struct if it causes problems.
-	  if (-1 == close(stdin)) // Close stdin 
-	    perror("close");
-	  if (-1 == open(input_file, O_RDONLY)) // Open input_file, should replace stdin
-	    perror("open");
-	}
-      } else {
-	if (-1 == close(stdin)) 
-	  perror("close");
-	if (-1 == dup(pipein)) // Make duplicate of pipein at stdin
-	  perror("dup");
-	if (-1 == close(pipein)) // Close other pipein since stdin now is fd for it 
-	  perror("close");
-      }
-      // If last command in pipeline
-      if (pipeline->length == commandnum) {
-	// If there is output overwrite redirect
-	if (NULL != output_file) {
-	  if (-1 == close(stdout)) 
-	    perror("close");
-	  if (-1 == open(output_file, O_WRONLY))
-	    perror("open");
-	}
-	// If there is output append redirect
-	else if (NULL != append_file) {	
-	  if (-1 == close(stdout)) 
-	    perror("close");
-	  if (-1 == open(output_file, O_APPEND))
-	    perror("open");
-	}
-      } else {
-	if (-1 == close(nextin))
-	  perror("close");
-	if (-1 == close(stdout))
-	  perror("close");
-	if (-1 == dup(pipeout)) 
-	  perror("dup");
-	if (-1 == close(pipeout)) 
-	  perror("close");
-      }
-      if(-1 == execvp(travel->newargv[0], travel->newargv)) // This won't compile b/c newargv ain't const.
-	perror("execvp");
-    } else { // Else it is the parent process (Jshell)
-      // Record the child PID here (what?)
-      
-      // If this is NOT the first process in the pipeline
-      if (1 != commandnum) {
-	// Close pipein since child has it
-	if (-1 == close(pipein))
-	  perror("close");
-      }
-      // If this is NOT the last process in the pipeline
-      if (pipeline->length != commandnum) {
-	// Could alternatively be written(?): (close(pipeout) == -1) ? perror("close");
-	if (-1 == close(pipeout))
-	  perror("close");
-      }
-    }
-    ++commandnum;
-  }
-*/

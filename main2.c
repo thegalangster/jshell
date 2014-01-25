@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+
 struct Info{
 
   char *input_file;
@@ -22,7 +27,7 @@ int main()
 {
 
   struct Info *head; // head of the linked list of commands
-  int background= 0; // flag if we want to run line in background
+  int background; // flag if we want to run line in background
 
   while(1)
     {
@@ -61,6 +66,8 @@ int main()
   command->input_file= NULL;
   command->output_file= NULL;
   command->append_file= NULL;
+  background= 0;
+  head= command;
 
   /* Strtok() is used to parse the string
      buffer by white-spaces. */
@@ -260,13 +267,13 @@ int main()
      jshell re-asks for a new correct line to be
      inputted */
 
+  struct Info *temp1;
   if(redo)
     {
       redo= 0;
 
       /* De-allocate Memory */
 
-      struct Info *temp1;
       for(temp1= head;temp1!= NULL;temp1= temp1->next)
 	{
 	  free(temp1->newargv);
@@ -280,7 +287,6 @@ int main()
   /* Error Checking
      Checks for empty newargv array (no commands and arguments) */
 
-  struct Info *temp1;
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
     {
       if(temp1->newargv[0]== NULL)
@@ -312,12 +318,14 @@ int main()
 
   /* FORK AND EXECUTE HERE */
 
-  int pipeout, nextin;
+  pid_t childpid;
+  int pipein, pipeout, nextin;
   int pipefd[2];
+  int dummy;
 
   /* Loop through commands */
 
-  struct Info temp;
+  struct Info *temp;
   for(temp= head; temp!= NULL; temp= temp->next)
     {
 
@@ -327,24 +335,131 @@ int main()
 
       if(temp->next!= NULL)
 	{
-
 	  int i= pipe(pipefd);
 	  if(i< 0)
 	    {
-	      perror("Pipe error");
+	      perror("pipe");
+	      exit(1);
+	    }
+	  pipeout= pipefd[1];
+	  nextin= pipefd[0];
+	}
+
+	  /* Call fork -> if this is the child */
+
+      childpid= fork();
+      if(childpid< 0)
+	{
+	  perror("fork not successful");
+	  exit(1);
+	}
+
+	  if(childpid== 0)
+	    {
+
+	      /* If this is the first command
+		 in the pipeline */
+
+	      if(temp== head)
+		{
+
+		  /* If there is input re-direction */
+
+		  if(temp->input_file!= NULL)
+		    {
+		      close(0);
+		      int fd1= open(temp->input_file,O_RDWR,0666);
+		      if(fd1< 0)
+			{
+			  perror("cannot open input file");
+			  exit(1);
+			}
+		    }
+		}
+	    
+	      /* Else not the first command */
+
+		  else
+		    {
+		      close(0);
+		      dup2(pipein,0);
+		      close(pipein);
+		    }
+
+	      /* If this is the last command in
+		 the pipeline */
+
+	      if(temp->next== NULL)
+		{
+
+		  /* If there is an output or append redirection */
+
+		  if(temp->output_file!= NULL)
+		    {
+		      close(1);
+		      int fd2= open(temp->output_file,O_RDWR|O_TRUNC|O_CREAT,0666);
+		      if(fd2< 0)
+			{
+			  perror("cannot open output file");
+			  exit(1);
+			}
+		    }
+
+		  if(temp->append_file!= NULL)
+		    {
+		      close(1);
+		      int fd3= open(temp->append_file,O_RDWR|O_APPEND|O_CREAT,0666);
+		      if(fd3< 0)
+			{
+			  perror("cannot open append output file");
+			  exit(1);
+			}
+		    }
+		}
+
+		  /* Else there is no output or append redirection */
+
+		  else
+		    {
+		      close(nextin);
+		      close(1);
+		      dup2(pipeout,1);
+		      close(pipeout);
+		    }
+
+	      /* Call execvp */
+
+	      execvp(temp->newargv[0],temp->newargv);
+	      perror("execution failed: check for invalid commands and arguments");
 	      exit(1);
 	    }
 
+	  /* -> else it is the parent */
 
+	  else
+	    {
+	      wait(&dummy);
 
-	}
+	      /* If not the first process */
 
-    } // end loop through commands
+	      if(temp!= head)
+		{
+		  close(pipein);
+		}
 
+	      /* If not the last process */
+
+	      if(temp->next!= NULL)
+		{
+		  close(pipeout);
+		  pipein= nextin;
+		}
+	    }
+
+    }
 
   /* De-allocate Memory */
 
-  struct Info *temp1;
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
     {
       free(temp1->newargv);
@@ -356,97 +471,3 @@ int main()
 }
 
 
-
-  /* Fork and Execute */
-  // NOTE: my code assumes use of the pipeline struct. 
-  /*
-  pid_t childpid;
-  int status;
-  int pipefd[2];
-  int pipeout, pipein, nextin, inputfd;
-  int commandnum = 1;
-
-  // Loop through all commands
-  Command *travel;
-  for (travel = pipeline->head; travel->next != NULL; travel = travel->next) {
-    // If this is not the last command in the pipeline, call pipe.
-    if (commandnum != pipeline->length) {
-      if (-1 == pipe(pipefd)) {
-	perror("pipe");
-        exit(EXIT_FAILURE);
-      }
-      pipein = pipefd[0];
-      pipeout = pipefd[1];
-    }
-    // Fork child process. 
-    childpid = fork();
-    if (-1 == childpid) {
-      perror("fork");
-      exit(EXIT_FAILURE);
-    }
-    // If this is the child process 
-    if (0 == childpid) {
-      // If first command in pipeline
-      if (1 == commandnum) { // Was going to do *travel == *head but it made me uneasy
-	// If there is input redirection
-	if (NULL != input_file) { // Unsure if this will work, could just have a boolean inputRedirection var in Command struct if it causes problems.
-	  if (-1 == close(stdin)) // Close stdin 
-	    perror("close");
-	  if (-1 == open(input_file, O_RDONLY)) // Open input_file, should replace stdin
-	    perror("open");
-	}
-      } else {
-	if (-1 == close(stdin)) 
-	  perror("close");
-	if (-1 == dup(pipein)) // Make duplicate of pipein at stdin
-	  perror("dup");
-	if (-1 == close(pipein)) // Close other pipein since stdin now is fd for it 
-	  perror("close");
-      }
-      // If last command in pipeline
-      if (pipeline->length == commandnum) {
-	// If there is output overwrite redirect
-	if (NULL != output_file) {
-	  if (-1 == close(stdout)) 
-	    perror("close");
-	  if (-1 == open(output_file, O_WRONLY))
-	    perror("open");
-	}
-	// If there is output append redirect
-	else if (NULL != append_file) {	
-	  if (-1 == close(stdout)) 
-	    perror("close");
-	  if (-1 == open(output_file, O_APPEND))
-	    perror("open");
-	}
-      } else {
-	if (-1 == close(nextin))
-	  perror("close");
-	if (-1 == close(stdout))
-	  perror("close");
-	if (-1 == dup(pipeout)) 
-	  perror("dup");
-	if (-1 == close(pipeout)) 
-	  perror("close");
-      }
-      if(-1 == execvp(travel->newargv[0], travel->newargv)) // This won't compile b/c newargv ain't const.
-	perror("execvp");
-    } else { // Else it is the parent process (Jshell)
-      // Record the child PID here (what?)
-      
-      // If this is NOT the first process in the pipeline
-      if (1 != commandnum) {
-	// Close pipein since child has it
-	if (-1 == close(pipein))
-	  perror("close");
-      }
-      // If this is NOT the last process in the pipeline
-      if (pipeline->length != commandnum) {
-	// Could alternatively be written(?): (close(pipeout) == -1) ? perror("close");
-	if (-1 == close(pipeout))
-	  perror("close");
-      }
-    }
-    ++commandnum;
-  }
-*/
