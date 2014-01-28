@@ -24,12 +24,19 @@ struct Info{
 
 };
 
-int main()
+int main(int argc, char **argv)
 {
 
   struct Info *head; // head of the linked list of commands
   int background; // flag if we want to run line in background
+  char *prompt = "Jsh: ";
 
+  // Check if prompt argument passed
+  if (argc == 2)
+    prompt = argv[1];
+  else if (argc > 2)
+    fprintf(stderr, "USAGE: jshell [PROMPT]\nDon't try 'jshell --help'\nPROMPT set to 'Jsh: '\n");
+  
   while(1)
     {
 
@@ -40,7 +47,7 @@ int main()
      The string is stored in a character array
      named buffer. */
 
-  printf("jshell: ");
+  printf("%s", prompt);
   fflush(stdin);
   if(fgets(buffer,256,stdin)== NULL) // CTRL-D exit
     return 0;
