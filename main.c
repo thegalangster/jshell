@@ -12,14 +12,21 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+
+// Struct for keeping track of return statuses.
+typedef struct Status Status;
+struct Status {
+  int status;
+  pid_t pid;
+  int *next;
+};
+
 struct Info{
 
   char *input_file;
   char *output_file;
   char *append_file;
-
   char **newargv;
-
   struct Info *next;
 
 };
@@ -28,8 +35,12 @@ int main(int argc, char **argv)
 {
 
   struct Info *head; // head of the linked list of commands
-  int background; // flag if we want to run line in background
+  int background= 0; // flag if we want to run line in background
   char *prompt = "Jsh: ";
+
+  Status *statHead = (Status *)malloc(sizeof(Status));
+  statHead->next = NULL; // Not sure if necessary.
+  Status *statTemp = statHead;
 
   // Check if prompt argument passed
   if (argc == 2)
@@ -46,6 +57,9 @@ int main(int argc, char **argv)
      until a newline character is reached. 
      The string is stored in a character array
      named buffer. */
+
+  /* Wait for processes if necessary. */
+
 
   printf("%s", prompt);
   fflush(stdin);
@@ -112,7 +126,7 @@ int main(int argc, char **argv)
 	  /* Error Checking
 	     Check stray < with no following word as file input */
 
-	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<")))
+	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
 	    {
 	      fprintf(stderr,"ERROR: no input file inputted after <\n");
 	      redo= 1;
@@ -139,7 +153,7 @@ int main(int argc, char **argv)
 	  /* Error Checking
 	     Check stray << with no following word as file to append */
 
-	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<")))
+	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
 	    {
 	      fprintf(stderr,"ERROR: improper filename found after >>\n");
 	      redo= 1;
@@ -166,7 +180,7 @@ int main(int argc, char **argv)
 	  /* Error Checking
 	     Check stray > with no following word as file output */
 
-	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<")))
+	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
 	    {
 	      fprintf(stderr,"ERROR: improper filename found after >\n");
 	      redo= 1;
@@ -329,7 +343,8 @@ int main(int argc, char **argv)
   pid_t childpid;
   int pipein, pipeout, nextin;
   int pipefd[2];
-  int dummy;
+  //int dummy;
+  
 
   /* Loop through commands */
 
@@ -352,8 +367,7 @@ int main(int argc, char **argv)
 	  nextin= pipefd[0];
 	}
 
-      /* Call fork -> if this is the child */
-
+      /* Call fork */
       childpid= fork();
       if(childpid< 0)
 	{
@@ -361,153 +375,178 @@ int main(int argc, char **argv)
 	  exit(1);
 	}
 
-	  if(childpid== 0)
+      /* If this is the child process */
+      if(childpid== 0)
+	{
+	  
+	  /* If this is the first command
+	     in the pipeline */
+	  
+	  if(temp== head)
 	    {
-
-	      /* If this is the first command
-		 in the pipeline */
-
-	      if(temp== head)
+	      
+	      /* If there is input re-direction */
+	      
+	      if(temp->input_file!= NULL)
 		{
-
-		  /* If there is input re-direction */
-
-		  if(temp->input_file!= NULL)
+		  close(0);
+		  if(open(temp->input_file,O_RDWR,0666)< 0)
 		    {
-		      close(0);
-		      if(open(temp->input_file,O_RDWR,0666)< 0)
-			{
-			  perror("input file");
-			  exit(1);
-			}
-		    }
-		}
-	    
-	      /* Else not the first command */
-
-		  else
-		    {
-		      if(close(0)< 0)
-			{
-			  perror("close");
-			  exit(1);
-			}
-		      if(dup2(pipein,0)< 0)
-			{
-			  perror("dup2");
-			  exit(1);
-			}
-		      if(close(pipein)< 0)
-			{
-			  perror("close");
-			  exit(1);
-			}
-		    }
-
-	      /* If this is the last command in
-		 the pipeline */
-
-	      if(temp->next== NULL)
-		{
-
-		  /* If there is an output or append redirection */
-
-		  if(temp->output_file!= NULL)
-		    {
-		      close(1);
-		      if(open(temp->output_file,O_RDWR|O_TRUNC|O_CREAT,0666)< 0)
-			{
-			  perror("cannot open output file");
-			  exit(1);
-			}
-		    }
-
-		  if(temp->append_file!= NULL)
-		    {
-		      close(1);
-		      int fd3= open(temp->append_file,O_RDWR|O_APPEND|O_CREAT,0666);
-		      if(fd3< 0)
-			{
-			  perror("cannot open append output file");
-			  exit(1);
-			}
-		    }
-		}
-
-		  /* Else there is no output or append redirection */
-
-		  else
-		    {
-		      if(close(nextin)< 0)
-			{
-			  perror("close");
-			  exit(1);
-			}
-		      if(close(1)< 0)
-			{
-			  perror("close");
-			  exit(1);
-			}
-		      if(dup2(pipeout,1)< 0)
-			{
-			  perror("pipe");
-			  exit(1);
-			}
-		      if(close(pipeout)< 0)
-			{
-			  perror("close");
-			  exit(1);
-			}
-		    }
-
-	      /* Call execvp */
-
-	      execvp(temp->newargv[0],temp->newargv);
-	      perror("execution failed -> check for invalid commands and arguments");
-	      exit(1);
-	    }
-
-	  /* -> else it is the parent */
-
-	  else
-	    {
-	      wait(&dummy);
-
-	      /* If not the first process */
-
-	      if(temp!= head)
-		{
-		  if(close(pipein)< 0)
-		    {
-		      perror("close");
+		      perror("input file");
 		      exit(1);
 		    }
-		}
-
-	      /* If not the last process */
-
-	      if(temp->next!= NULL)
-		{
-		  if(close(pipeout)< 0)
-		    {
-		      perror("close");
-		      exit(1);
-		    }
-		  pipein= nextin;
 		}
 	    }
 	  
+	  /* Else not the first command */
+	  
+	  else
+	    {
+	      if(close(0)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	      if(dup2(pipein,0)< 0)
+		{
+		  perror("dup2");
+		  exit(1);
+		}
+	      if(close(pipein)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	    }
+	  
+	  /* If this is the last command in
+	     the pipeline */
+	  
+	  if(temp->next== NULL)
+	    {
+	      
+	      /* If there is an output or append redirection */
+	      
+	      if(temp->output_file!= NULL)
+		{
+		  close(1);
+		  if(open(temp->output_file,O_RDWR|O_TRUNC|O_CREAT,0666)< 0)
+		    {
+		      perror("cannot open output file");
+		      exit(1);
+		    }
+		}
+	      
+	      if(temp->append_file!= NULL)
+		{
+		  close(1);
+		  int fd3= open(temp->append_file,O_RDWR|O_APPEND|O_CREAT,0666);
+		  if(fd3< 0)
+		    {
+		      perror("cannot open append output file");
+		      exit(1);
+		    }
+		}
+	    }
+	  
+	  /* Else there is no output or append redirection */
+	  
+	  else
+	    {
+	      if(close(nextin)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	      if(close(1)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	      if(dup2(pipeout,1)< 0)
+		{
+		  perror("pipe");
+		  exit(1);
+		}
+	      if(close(pipeout)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	    }
+	  
+	  /* Call execvp */
+	  
+	  execvp(temp->newargv[0],temp->newargv);
+	  perror("execution failed -> check for invalid commands and arguments");
+	  exit(1);
+	}
+      
+      /* -> else it is the parent */
+      
+      else
+	{
+	  // wait(&dummy);
+
+	  // Record childpid.
+	  statTemp->pid = childpid;
+	  statTemp->next = (Status *)malloc(sizeof(Status));
+	  statTemp = statTemp->next;
+	  statTemp->next = NULL; // Not sure if this is necessary.     
+	  	  
+	  /* If not the first process */
+	  
+	  if(temp!= head)
+	    {
+	      if(close(pipein)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	    }
+	  
+	  /* If not the last process */
+	  
+	  if(temp->next!= NULL)
+	    {
+	      if(close(pipeout)< 0)
+		{
+		  perror("close");
+		  exit(1);
+		}
+	      pipein= nextin;
+	    }
+	}
     }
-
+  
   /* De-allocate Memory */
+  struct Info *infoTravel = head;
+  while (infoTravel != NULL) {
+    temp1 = infoTravel;
+    infoTravel = infoTravel->next;
+    free(temp1);
+  }
+  head = NULL; // Probably not necessary; for good measure.
 
+  Status *statTravel = statHead;
+  Status *temp;
+  while (statTravel != NULL) {
+    temp = statTravel;
+    statTravel = statTravel->next;
+    free(temp);
+  }
+  statHead = NULL:
+  
+  /* I think this may not work  because you are freeing temp1 and then
+   * setting it by referencing its next pointer.
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
     {
       free(temp1->newargv);
       free(temp1);
     }
+  */
     }
-
+  
   return 0;
 }
 
