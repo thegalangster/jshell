@@ -34,7 +34,7 @@ struct Info{
 int main(int argc, char **argv)
 {
 
-  struct Info *head; // head of the linked list of commands
+  struct Info *head= NULL; // head of the linked list of commands
   int background= 0; // flag if we want to run line in background
   char *prompt = "Jsh: ";
 
@@ -138,9 +138,9 @@ int main(int argc, char **argv)
 	  /* Error Checking
 	     Check stray < with no following word as file input */
 
-	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
+	  if((word== NULL)||(strchr(word,'|')!= NULL)||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
 	    {
-	      fprintf(stderr,"ERROR: no input file inputted after <\n");
+	      fprintf(stderr,"ERROR: invalid filename found after <\n");
 	      redo= 1;
 	      break;
 	    }
@@ -165,9 +165,9 @@ int main(int argc, char **argv)
 	  /* Error Checking
 	     Check stray << with no following word as file to append */
 
-	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
+	  if((word== NULL)||(strchr(word,'|')!= NULL)||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
 	    {
-	      fprintf(stderr,"ERROR: improper filename found after >>\n");
+	      fprintf(stderr,"ERROR: invalid filename found after >>\n");
 	      redo= 1;
 	      break;
 	    }
@@ -185,16 +185,16 @@ int main(int argc, char **argv)
  	  word= strtok(NULL, " ");
 	  continue;
 	}
-      else if(!strcmp(word,">"))
+      if(!strcmp(word,">"))
 	{
  	  word= strtok(NULL, " ");
 
 	  /* Error Checking
 	     Check stray > with no following word as file output */
 
-	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
+	  if((word== NULL)||(strchr(word,'|')!= NULL)||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<"))||(!strcmp(word,"&")))
 	    {
-	      fprintf(stderr,"ERROR: improper filename found after >\n");
+	      fprintf(stderr,"ERROR: invalid filename found after >\n");
 	      redo= 1;
 	      break;
 	    }
@@ -256,20 +256,20 @@ int main(int argc, char **argv)
 	  break;
 	}
 
-      /* Checks for & as the last character in a line and
-	 sets background= 1 for the command if so */
+      /* Checks for & as the last character in a line or before a "|"
+	 command and sets background= 1 for the command if so */
 
       char *hold= word;
       word= strtok(NULL, " ");
-      if((word== NULL)&&(!strcmp(hold,"&")))
+      if((!strcmp(hold,"&"))&&((word== NULL)||(!strcmp(word,"|"))&&(!strcmp(hold,"&"))))
 	{
 	  background= 1;
 	  printf("runs in background\n");
-	  break;
+	  continue;
 	}
 
       /* Error Checking
-	 Checks for &s that are not at the end of a line and exits */
+	 Checks for invalid &s and exits */
 
       else
 	{
@@ -302,17 +302,20 @@ int main(int argc, char **argv)
      inputted */
 
   struct Info *temp1;
+  struct Info *infoTravel= head;
+
   if(redo)
     {
       redo= 0;
 
       /* De-allocate Memory */
-
-      for(temp1= head;temp1!= NULL;temp1= temp1->next)
-	{
-	  free(temp1->newargv);
-	  free(temp1);
-	}
+      infoTravel= head;
+      while (infoTravel != NULL) {
+	temp1 = infoTravel;
+	infoTravel = infoTravel->next;
+	free(temp1);
+	free(temp1->newargv);
+      }
       continue;
     }
 
@@ -339,14 +342,14 @@ int main(int argc, char **argv)
     {
       redo= 0;
 
-      /* De-allocate Memory */
-
+      infoTravel = head;
       struct Info *temp2;
-      for(temp2= head;temp2!= NULL;temp2= temp2->next)
-	{
-	  free(temp2->newargv);
-	  free(temp2);
-	}
+      while (infoTravel!= NULL) {
+	temp2= infoTravel;
+	infoTravel = infoTravel->next;
+	free(temp2);
+	free(temp2->newargv);
+      }
       continue;
     }
 
@@ -534,23 +537,15 @@ int main(int argc, char **argv)
     }
   
   /* De-allocate Memory */
-  struct Info *infoTravel = head;
+  infoTravel = head;
   while (infoTravel != NULL) {
     temp1 = infoTravel;
     infoTravel = infoTravel->next;
     free(temp1);
+    free(temp1->newargv);
   }
-  head = NULL; // Probably not necessary; for good measure.
 
 
-  /* I think this may not work  because you are freeing temp1 and then
-   * setting it by referencing its next pointer.
-  for(temp1= head;temp1!= NULL;temp1= temp1->next)
-    {
-      free(temp1->newargv);
-      free(temp1);
-    }
-  */
     }
   free(statHead);
   
