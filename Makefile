@@ -1,15 +1,15 @@
-$(CC)=gcc
-CFLAGS=-Wall
+CC=gcc
+CFLAGS=-Wall -g
 LIBS=
 DEPS=
-OBJ=main.o
+OBJS=main2.o
+EXE=jshell
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-debug: CC += -g
-debug: jshell
-
-jshell: $(OBJ)
+$(EXE): $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
+clean: 
+	$(RM) $(OBJS) $(EXE)
