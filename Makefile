@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -g
 LIBS=
 DEPS=
-OBJS=main2.o
+OBJS=main.o
 EXE=jshell
 
 %.o: %.c $(DEPS)
