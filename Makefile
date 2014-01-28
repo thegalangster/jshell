@@ -13,3 +13,6 @@ $(EXE): $(OBJS)
 
 clean: 
 	$(RM) $(OBJS) $(EXE)
+
+bgTest: bgTest.c
+	$(CC) -o $@ $^ $(CFLAGS)
