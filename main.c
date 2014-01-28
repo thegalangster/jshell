@@ -18,7 +18,7 @@ typedef struct Status Status;
 struct Status {
   int status;
   pid_t pid;
-  int *next;
+  Status *next;
 };
 
 struct Info{
@@ -40,6 +40,7 @@ int main(int argc, char **argv)
 
   Status *statHead = (Status *)malloc(sizeof(Status));
   statHead->next = NULL; // Not sure if necessary.
+  Status *statTravel = statHead;
   Status *statTemp = statHead;
 
   // Check if prompt argument passed
@@ -53,14 +54,25 @@ int main(int argc, char **argv)
 
   char buffer[256];
 
+  /* Wait for processes if necessary. */
+  if (statHead->pid != 0) {
+    statTravel = statHead;
+    while (statTravel != NULL) {
+      if (background == 1)
+	waitpid(statTravel->pid, &(statTravel->status), WNOHANG);
+      else
+	waitpid(statTravel->pid, &(statTravel->status), 0);
+      // Deallocate status list now that we've called wait. 
+      statTemp = statTravel;
+      statTravel = statTravel->next;
+      free(statTemp);
+    }
+  }
+  
   /* Fgets is used to grab a string of stdin
      until a newline character is reached. 
      The string is stored in a character array
      named buffer. */
-
-  /* Wait for processes if necessary. */
-
-
   printf("%s", prompt);
   fflush(stdin);
   if(fgets(buffer,256,stdin)== NULL) // CTRL-D exit
@@ -347,7 +359,7 @@ int main(int argc, char **argv)
   
 
   /* Loop through commands */
-
+  statTemp = statHead;
   struct Info *temp;
   for(temp= head; temp!= NULL; temp= temp->next)
     {
@@ -489,10 +501,12 @@ int main(int argc, char **argv)
 	  // wait(&dummy);
 
 	  // Record childpid.
-	  statTemp->pid = childpid;
+    	  statTemp->pid = childpid;
 	  statTemp->next = (Status *)malloc(sizeof(Status));
 	  statTemp = statTemp->next;
 	  statTemp->next = NULL; // Not sure if this is necessary.     
+
+
 	  	  
 	  /* If not the first process */
 	  
@@ -528,15 +542,7 @@ int main(int argc, char **argv)
   }
   head = NULL; // Probably not necessary; for good measure.
 
-  Status *statTravel = statHead;
-  Status *temp;
-  while (statTravel != NULL) {
-    temp = statTravel;
-    statTravel = statTravel->next;
-    free(temp);
-  }
-  statHead = NULL:
-  
+
   /* I think this may not work  because you are freeing temp1 and then
    * setting it by referencing its next pointer.
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
@@ -546,8 +552,7 @@ int main(int argc, char **argv)
     }
   */
     }
+  free(statHead);
   
   return 0;
 }
-
-
