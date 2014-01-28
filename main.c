@@ -5,7 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcnt1.h>
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 struct Info{
 
@@ -23,7 +28,7 @@ int main()
 {
 
   struct Info *head; // head of the linked list of commands
-  int background= 0; // flag if we want to run line in background
+  int background; // flag if we want to run line in background
 
   while(1)
     {
@@ -100,7 +105,7 @@ int main()
 	  /* Error Checking
 	     Check stray < with no following word as file input */
 
-	  if((word== NULL)||(!strcmp(word,"|")))
+	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<")))
 	    {
 	      fprintf(stderr,"ERROR: no input file inputted after <\n");
 	      redo= 1;
@@ -120,43 +125,16 @@ int main()
  	  word= strtok(NULL, " ");
 	  continue;
 	}
-      if(!strcmp(word,">"))
-	{
- 	  word= strtok(NULL, " ");
-
-	  /* Error Checking
-	     Check stray > with no following word as file output */
-
-	  if((word== NULL)||(!strcmp(word,"|")))
-	    {
-	      fprintf(stderr,"ERROR: no output file inputted after >\n");
-	      redo= 1;
-	      break;
-	    }
-
-	  command->output_file= (char *)malloc(sizeof(char)*strlen(word));
-	  if(command->output_file== NULL)
-	    {
-	      fprintf(stderr,"ERROR: malloc allocation failed\n");
-	      exit(1);
-	    }
-	  strcpy(command->output_file,word);
-
-	  printf("output file: %s\n",word);
-
- 	  word= strtok(NULL, " ");
-	  continue;
-	}
-      if(!strcmp(word,"<<"))
+      if(!strcmp(word,">>"))
 	{
  	  word= strtok(NULL, " ");
 
 	  /* Error Checking
 	     Check stray << with no following word as file to append */
 
-	  if((word== NULL)||(!strcmp(word,"|")))
+	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<")))
 	    {
-	      fprintf(stderr,"ERROR: no file to append inputted after <<\n");
+	      fprintf(stderr,"ERROR: improper filename found after >>\n");
 	      redo= 1;
 	      break;
 	    }
@@ -170,6 +148,33 @@ int main()
 	  strcpy(command->append_file,word);
 
 	  printf("append file: %s\n",word);
+
+ 	  word= strtok(NULL, " ");
+	  continue;
+	}
+      else if(!strcmp(word,">"))
+	{
+ 	  word= strtok(NULL, " ");
+
+	  /* Error Checking
+	     Check stray > with no following word as file output */
+
+	  if((word== NULL)||(!strcmp(word,"|"))||(!strcmp(word,">>"))||(!strcmp(word,">"))||(!strcmp(word,"<")))
+	    {
+	      fprintf(stderr,"ERROR: improper filename found after >\n");
+	      redo= 1;
+	      break;
+	    }
+
+	  command->output_file= (char *)malloc(sizeof(char)*strlen(word));
+	  if(command->output_file== NULL)
+	    {
+	      fprintf(stderr,"ERROR: malloc allocation failed\n");
+	      exit(1);
+	    }
+	  strcpy(command->output_file,word);
+
+	  printf("output file: %s\n",word);
 
  	  word= strtok(NULL, " ");
 	  continue;
@@ -312,6 +317,181 @@ int main()
       continue;
     }
 
+  /* FORK AND EXECUTE HERE */
+
+  pid_t childpid;
+  int pipein, pipeout, nextin;
+  int pipefd[2];
+  int dummy;
+
+  /* Loop through commands */
+
+  struct Info *temp;
+  for(temp= head; temp!= NULL; temp= temp->next)
+    {
+
+      /* If this is not the last command in the pipeline:
+	 Call pipe to allcoate two file descriptors for the pipe
+	 and save one as 'pipeout' and 'nextin' */
+
+      if(temp->next!= NULL)
+	{
+	  if(pipe(pipefd)< 0)
+	    {
+	      perror("pipe");
+	      exit(1);
+	    }
+	  pipeout= pipefd[1];
+	  nextin= pipefd[0];
+	}
+
+      /* Call fork -> if this is the child */
+
+      childpid= fork();
+      if(childpid< 0)
+	{
+	  perror("fork");
+	  exit(1);
+	}
+
+	  if(childpid== 0)
+	    {
+
+	      /* If this is the first command
+		 in the pipeline */
+
+	      if(temp== head)
+		{
+
+		  /* If there is input re-direction */
+
+		  if(temp->input_file!= NULL)
+		    {
+		      close(0);
+		      if(open(temp->input_file,O_RDWR,0666)< 0)
+			{
+			  perror("input file");
+			  exit(1);
+			}
+		    }
+		}
+	    
+	      /* Else not the first command */
+
+		  else
+		    {
+		      if(close(0)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		      if(dup2(pipein,0)< 0)
+			{
+			  perror("dup2");
+			  exit(1);
+			}
+		      if(close(pipein)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		    }
+
+	      /* If this is the last command in
+		 the pipeline */
+
+	      if(temp->next== NULL)
+		{
+
+		  /* If there is an output or append redirection */
+
+		  if(temp->output_file!= NULL)
+		    {
+		      close(1);
+		      if(open(temp->output_file,O_RDWR|O_TRUNC|O_CREAT,0666)< 0)
+			{
+			  perror("cannot open output file");
+			  exit(1);
+			}
+		    }
+
+		  if(temp->append_file!= NULL)
+		    {
+		      close(1);
+		      int fd3= open(temp->append_file,O_RDWR|O_APPEND|O_CREAT,0666);
+		      if(fd3< 0)
+			{
+			  perror("cannot open append output file");
+			  exit(1);
+			}
+		    }
+		}
+
+		  /* Else there is no output or append redirection */
+
+		  else
+		    {
+		      if(close(nextin)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		      if(close(1)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		      if(dup2(pipeout,1)< 0)
+			{
+			  perror("pipe");
+			  exit(1);
+			}
+		      if(close(pipeout)< 0)
+			{
+			  perror("close");
+			  exit(1);
+			}
+		    }
+
+	      /* Call execvp */
+
+	      execvp(temp->newargv[0],temp->newargv);
+	      perror("execution failed -> check for invalid commands and arguments");
+	      exit(1);
+	    }
+
+	  /* -> else it is the parent */
+
+	  else
+	    {
+	      wait(&dummy);
+
+	      /* If not the first process */
+
+	      if(temp!= head)
+		{
+		  if(close(pipein)< 0)
+		    {
+		      perror("close");
+		      exit(1);
+		    }
+		}
+
+	      /* If not the last process */
+
+	      if(temp->next!= NULL)
+		{
+		  if(close(pipeout)< 0)
+		    {
+		      perror("close");
+		      exit(1);
+		    }
+		  pipein= nextin;
+		}
+	    }
+	  
+    }
+
   /* De-allocate Memory */
 
   for(temp1= head;temp1!= NULL;temp1= temp1->next)
@@ -323,3 +503,5 @@ int main()
 
   return 0;
 }
+
+
