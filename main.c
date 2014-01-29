@@ -35,10 +35,12 @@ int main(int argc, char **argv)
 {
 
   struct Info *head= NULL; // head of the linked list of commands
+  struct Info *temp1;
+  struct Info *infoTravel= head;
   int background= 0; // flag if we want to run line in background
   char *prompt = "Jsh: ";
 
-  int jobArrLen = 128;
+  int jobArrLen = 1024;
   Job jobArr[jobArrLen];
   int jobi = 0;
   for (jobi = 0; jobi < jobArrLen; ++jobi) {
@@ -47,14 +49,6 @@ int main(int argc, char **argv)
     jobArr[jobi].background = 0;
   }
   int first = 1;
-
-  /*
-  Status *statHead = (Status *)malloc(sizeof(Status));
-  statHead->next = NULL; // Not sure if necessary.
-  Status *statTravel = statHead;
-  Status *statTemp = statHead;
-  */
-
   int waitValue;
 
   // Check if prompt argument passed
@@ -144,9 +138,23 @@ int main(int argc, char **argv)
       word= strtok(buffer, " ");
       while(word!= NULL)
 	{
-	  if(!strcmp(word,"exit")) // exit if 'exit' is the first word
+	  if(!strcmp(word,"exit")) { // exit if 'exit' is the first word
+	    /* De-allocate linked list of commands. */
+	    infoTravel= head;
+	    while (infoTravel != NULL) {
+	      temp1 = infoTravel;
+	      infoTravel = infoTravel->next;
+	      if (temp1->input_file != NULL)
+		free(temp1->input_file);
+	      if (temp1->append_file != NULL)
+		free(temp1->append_file);
+	      if (temp1->output_file != NULL)
+		free(temp1->output_file);
+	      free(temp1->newargv);
+	      free(temp1);
+	    }
 	    return 0;
-	  
+	  }
 	  /* Error Checking
 	     Check for ||, &&, if, while */
 	  
@@ -176,7 +184,7 @@ int main(int argc, char **argv)
 		  break;
 		}
 	      
-	      command->input_file= (char *)malloc(sizeof(char)*strlen(word));
+	      command->input_file= (char *)malloc(sizeof(char)*strlen(word)+1);
 	      if(command->input_file== NULL)
 		{
 		  fprintf(stderr,"ERROR: malloc allocation failed\n");
@@ -203,7 +211,7 @@ int main(int argc, char **argv)
 		  break;
 		}
 	      
-	      command->append_file= (char *)malloc(sizeof(char)*strlen(word));
+	      command->append_file= (char *)malloc(sizeof(char)*strlen(word)+1);
 	      if(command->append_file== NULL)
 		{
 		  fprintf(stderr,"ERROR: malloc allocation failed\n");
@@ -230,7 +238,7 @@ int main(int argc, char **argv)
 		  break;
 		}
 	      
-	      command->output_file= (char *)malloc(sizeof(char)*strlen(word));
+	      command->output_file= (char *)malloc(sizeof(char)*strlen(word)+1);
 	      if(command->output_file== NULL)
 		{
 		  fprintf(stderr,"ERROR: malloc allocation failed\n");
@@ -316,13 +324,14 @@ int main(int argc, char **argv)
 	     it is either a command name or a
 	     command argument or flag. */
 	  
-	  char *mem= (char *)malloc(sizeof(char)*strlen(hold));
+	  char *mem = hold;
+	  //char *mem= (char *)malloc(sizeof(char)*strlen(hold));
 	  if(mem== NULL)
 	    {
 	      fprintf(stderr,"malloc allocation failed\n");
 	      exit(1);
 	    }
-	  strcpy(mem,hold);
+	  //strcpy(mem,hold);
 	  command->newargv[i]= mem;
 	  //      printf("argv[%i]: %s\n",i,command->newargv[i]);
 	  i++;
@@ -332,20 +341,26 @@ int main(int argc, char **argv)
 	 jshell re-asks for a new correct line to be
 	 inputted */
       
-      struct Info *temp1;
-      struct Info *infoTravel= head;
+      //struct Info *temp1;
+      //struct Info *infoTravel= head;
       
       if(redo)
 	{
 	  redo= 0;
 	  
-	  /* De-allocate Memory */
+	  /* De-allocate linked list of commands. */
 	  infoTravel= head;
 	  while (infoTravel != NULL) {
 	    temp1 = infoTravel;
 	    infoTravel = infoTravel->next;
-	    free(temp1);
+	    if (temp1->input_file != NULL)
+	      free(temp1->input_file);
+	    if (temp1->append_file != NULL)
+	      free(temp1->append_file);
+	    if (temp1->output_file != NULL)
+	      free(temp1->output_file);
 	    free(temp1->newargv);
+	    free(temp1);
 	  }
 	  continue;
 	}
@@ -359,7 +374,7 @@ int main(int argc, char **argv)
 	{
 	  if(temp1->newargv[0]== NULL)
 	    {
-	      fprintf(stderr,"ERROR: no command\n");
+	      //fprintf(stderr,"ERROR: no command\n");
 	      redo= 1;
 	      break;
 	    }
@@ -373,6 +388,21 @@ int main(int argc, char **argv)
 	{
 	  redo= 0;
 	  
+	  /* De-allocate linked list of commands. */
+	  infoTravel= head;
+	  while (infoTravel != NULL) {
+	    temp1 = infoTravel;
+	    infoTravel = infoTravel->next;
+	    if (temp1->input_file != NULL)
+	      free(temp1->input_file);
+	    if (temp1->append_file != NULL)
+	      free(temp1->append_file);
+	    if (temp1->output_file != NULL)
+	      free(temp1->output_file);
+	    free(temp1->newargv);
+	    free(temp1);
+	  }
+	  /*
 	  infoTravel = head;
 	  struct Info *temp2;
 	  while (infoTravel!= NULL) {
@@ -381,20 +411,17 @@ int main(int argc, char **argv)
 	    free(temp2);
 	    free(temp2->newargv);
 	  }
+	  */
 	  continue;
 	}
       
-      /* FORK AND EXECUTE HERE */
-      
+      /* Fork and execute */
       pid_t childpid;
       int pipein, pipeout, nextin;
       int pipefd[2];
-      //int dummy;
-      
-      
+       
       /* Loop through commands */
-      // statTemp = statHead;
-      struct Info *temp;
+       struct Info *temp;
       for(temp= head; temp!= NULL; temp= temp->next)
 	{
 	  
@@ -541,15 +568,6 @@ int main(int argc, char **argv)
 		jobArr[jobi].background = 1;
 	      }
 	      
-	      
-	      /*
-		statTemp->pid = childpid;
-		statTemp->next = (Status *)malloc(sizeof(Status));
-		statTemp = statTemp->next;
-		statTemp->next = NULL; // Not sure if this is necessary.     
-	      */
-	      
-	      
 	      /* If not the first process */
 	      
 	      if(temp!= head)
@@ -575,18 +593,32 @@ int main(int argc, char **argv)
 	    }
 	}
       
+      /* De-allocate linked list of commands. */
+      infoTravel= head;
+      while (infoTravel != NULL) {
+	temp1 = infoTravel;
+	infoTravel = infoTravel->next;
+	if (temp1->input_file != NULL)
+	  free(temp1->input_file);
+	if (temp1->append_file != NULL)
+	  free(temp1->append_file);
+	if (temp1->output_file != NULL)
+	  free(temp1->output_file);
+	free(temp1->newargv);
+	free(temp1);
+      }
+      
       /* De-allocate Memory */
-      infoTravel = head;
+      /*infoTravel = head;
       while (infoTravel != NULL) {
 	temp1 = infoTravel;
 	infoTravel = infoTravel->next;
 	free(temp1->newargv);
 	free(temp1);
       }
+      */
       
       first = 0;
     }
-  // free(statHead);
-  
   return 0;
 }
