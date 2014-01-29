@@ -1,3 +1,9 @@
+/* bgTest sleeps for 5 seconds by default. 
+ * If called with any number of arguments from the command
+ * line, bgTest will sleep for the amount of time specified by the first
+ * argument and ignore the rest.
+ */
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
